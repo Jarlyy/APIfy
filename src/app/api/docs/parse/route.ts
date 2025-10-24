@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { APIDocumentation } from '@/lib/types';
 import SwaggerParser from '@apidevtools/swagger-parser';
-import { load } from '@readme/openapi-parser';
 
 export async function POST(request: Request) {
   try {
@@ -18,15 +17,8 @@ export async function POST(request: Request) {
     const { documentationUrl } = body;
     
     try {
-      // Парсинг OpenAPI/Swagger документации
-      // Сначала пробуем с помощью SwaggerParser
-      let apiSpec;
-      try {
-        apiSpec = await SwaggerParser.dereference(documentationUrl);
-      } catch (e) {
-        // Если SwaggerParser не сработал, пробуем @readme/openapi-parser
-        apiSpec = await load(documentationUrl);
-      }
+      // Парсинг OpenAPI/Swagger документации с помощью SwaggerParser
+      const apiSpec = await SwaggerParser.dereference(documentationUrl);
       
       // Извлечение информации из спецификации
       const endpoints: string[] = [];
@@ -42,8 +34,11 @@ export async function POST(request: Request) {
       
       // Извлечение информации об аутентификации
       const authMethods: string[] = [];
-      if (apiSpec.components && apiSpec.components.securitySchemes) {
-        for (const [schemeName, scheme] of Object.entries(apiSpec.components.securitySchemes)) {
+      // Приводим apiSpec к типу any для обхода проблем с типизацией
+      const typedSpec: any = apiSpec;
+      
+      if (typedSpec.components && typedSpec.components.securitySchemes) {
+        for (const [schemeName, scheme] of Object.entries(typedSpec.components.securitySchemes)) {
           const securityScheme: any = scheme;
           switch (securityScheme.type) {
             case 'apiKey':
@@ -62,8 +57,8 @@ export async function POST(request: Request) {
               authMethods.push(securityScheme.type);
           }
         }
-      } else if (apiSpec.security && Array.isArray(apiSpec.security)) {
-        for (const security of apiSpec.security) {
+      } else if (typedSpec.security && Array.isArray(typedSpec.security)) {
+        for (const security of typedSpec.security) {
           authMethods.push(...Object.keys(security));
         }
       }
